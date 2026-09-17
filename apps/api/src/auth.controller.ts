@@ -4,13 +4,18 @@ import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './auth.dto';
 
 const COOKIE = 'casino_session';
-const cookieOptions = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
-  maxAge: 7 * 86_400_000,
-  path: '/',
-};
+
+function cookieOptions() {
+  const origin = process.env.WEB_ORIGIN || '';
+  const secure = origin.startsWith('https://');
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure,
+    maxAge: 7 * 86_400_000,
+    path: '/',
+  };
+}
 
 @Controller('auth')
 export class AuthController {
@@ -25,14 +30,14 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const user = await this.auth.authenticate(dto);
     const token = await this.auth.createSession(user.id);
-    res.cookie(COOKIE, token, cookieOptions);
+    res.cookie(COOKIE, token, cookieOptions());
     return user;
   }
 
   @Post('logout')
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.auth.revoke(req.cookies?.[COOKIE]);
-    res.clearCookie(COOKIE, cookieOptions);
+    res.clearCookie(COOKIE, cookieOptions());
     return { ok: true };
   }
 

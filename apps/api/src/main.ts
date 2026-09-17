@@ -12,8 +12,11 @@ async function bootstrap() {
       throw new Error('SESSION_SECRET must be at least 32 characters');
     }
 
-    if (!process.env.WEB_ORIGIN || !/^https:\/\//.test(process.env.WEB_ORIGIN)) {
-      throw new Error('WEB_ORIGIN must use HTTPS in production');
+    // Require HTTPS only when explicitly deploying behind HTTPS
+    if (process.env.REQUIRE_HTTPS === 'true') {
+      if (!process.env.WEB_ORIGIN || !/^https:\/\//.test(process.env.WEB_ORIGIN)) {
+        throw new Error('WEB_ORIGIN must use HTTPS when REQUIRE_HTTPS=true');
+      }
     }
   }
 
