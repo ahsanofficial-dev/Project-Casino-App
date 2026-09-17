@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { createHash, randomBytes, scrypt as nodeScrypt } from 'crypto';
+import { createHash, randomBytes, scrypt as nodeScrypt, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { PrismaService } from './prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
@@ -14,10 +14,19 @@ async function hashPassword(password: string) {
 }
 
 async function verifyPassword(password: string, encoded: string) {
-  const [, salt, expected] = encoded.split('$');
-  if (!salt || !expected) return false;
-  const actual = (await scrypt(password, salt, 64)) as Buffer;
-  return actual.toString('hex') === expected;
+  const parts = encoded.split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const [, salt, expectedHex] = parts;
+  if (!salt || !expectedHex || expectedHex.length % 2 !== 0) return false;
+
+  try {
+    const expected = Buffer.from(expectedHex, 'hex');
+    const actual = (await scrypt(password, salt, expected.length)) as Buffer;
+    if (actual.length !== expected.length) return false;
+    return timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()

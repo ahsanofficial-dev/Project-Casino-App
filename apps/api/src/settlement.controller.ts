@@ -33,7 +33,9 @@ export class SettlementController {
         return bet;
       }
 
-      const payout = outcome === 'WON' ? bet.potentialReturnCents : outcome === 'VOID' ? bet.stakeCents : 0;
+      const payout =
+        outcome === 'WON' ? bet.potentialReturnCents : outcome === 'VOID' ? bet.stakeCents : 0;
+
       const updated = await tx.bet.updateMany({
         where: { id: betId, status: 'OPEN' },
         data: { status: outcome, settledAt: new Date() },
@@ -44,16 +46,16 @@ export class SettlementController {
       }
 
       if (payout > 0) {
-        const wallet = await tx.wallet.findUnique({ where: { userId: bet.userId } });
-        if (!wallet) {
-          throw new BadRequestException('Wallet not found for user');
-        }
-
-        await tx.wallet.update({
+        const walletUpdated = await tx.wallet.updateMany({
           where: { userId: bet.userId },
           data: { balanceCents: { increment: payout } },
         });
 
+        if (walletUpdated.count !== 1) {
+          throw new BadRequestException('Wallet not found for user');
+        }
+
+        // VOID returns stake (reversal of BET_STAKE); WON pays out
         await tx.ledgerEntry.create({
           data: {
             userId: bet.userId,

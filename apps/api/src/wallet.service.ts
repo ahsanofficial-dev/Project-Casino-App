@@ -38,22 +38,25 @@ export class WalletService {
         return existing;
       }
 
-      const wallet = await tx.wallet.findUnique({ where: { userId } });
-      if (!wallet) {
-        throw new NotFoundException('Wallet not found');
-      }
-
-      if (wallet.balanceCents + amountCents < 0) {
-        throw new BadRequestException('Insufficient balance');
-      }
-
-      const updatedWallet = await tx.wallet.update({
-        where: { userId },
-        data: { balanceCents: { increment: amountCents } },
-      });
-
-      if (!updatedWallet) {
-        throw new NotFoundException('Wallet not found');
+      // Atomic balance change: reject if debit would go below zero
+      if (amountCents < 0) {
+        const updated = await tx.wallet.updateMany({
+          where: { userId, balanceCents: { gte: -amountCents } },
+          data: { balanceCents: { increment: amountCents } },
+        });
+        if (updated.count !== 1) {
+          const wallet = await tx.wallet.findUnique({ where: { userId } });
+          if (!wallet) throw new NotFoundException('Wallet not found');
+          throw new BadRequestException('Insufficient balance');
+        }
+      } else {
+        const updated = await tx.wallet.updateMany({
+          where: { userId },
+          data: { balanceCents: { increment: amountCents } },
+        });
+        if (updated.count !== 1) {
+          throw new NotFoundException('Wallet not found');
+        }
       }
 
       return tx.ledgerEntry.create({

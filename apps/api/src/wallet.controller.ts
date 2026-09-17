@@ -34,39 +34,63 @@ export class WalletController {
   ) {
     const user = await this.current.require(req);
     const key = requireIdempotencyKey(rawKey);
-    const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey: key } });
 
-    if (
-      existing &&
-      (existing.userId !== user.id ||
-        existing.amountCents !== dto.amountCents ||
-        existing.type !== 'DEPOSIT')
-    ) {
-      throw new BadRequestException('Idempotency key was already used');
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.payment.findUnique({ where: { idempotencyKey: key } });
 
-    const payment =
-      existing ??
-      (await this.prisma.payment.create({
-        data: {
-          userId: user.id,
-          type: 'DEPOSIT',
-          amountCents: dto.amountCents,
-          status: 'COMPLETED',
-          providerReference: `mock_${key}`,
-          idempotencyKey: key,
-        },
-      }));
+      if (
+        existing &&
+        (existing.userId !== user.id ||
+          existing.amountCents !== dto.amountCents ||
+          existing.type !== 'DEPOSIT')
+      ) {
+        throw new BadRequestException('Idempotency key was already used');
+      }
 
-    await this.wallet.apply(
-      user.id,
-      dto.amountCents,
-      'DEPOSIT',
-      `payment:${payment.id}`,
-      payment.id,
-    );
+      const payment =
+        existing ??
+        (await tx.payment.create({
+          data: {
+            userId: user.id,
+            type: 'DEPOSIT',
+            amountCents: dto.amountCents,
+            status: 'COMPLETED',
+            providerReference: `mock_${key}`,
+            idempotencyKey: key,
+          },
+        }));
 
-    return { paymentId: payment.id, ...(await this.wallet.balance(user.id)) };
+      // Ledger idempotency is keyed off payment id so retries are safe
+      const ledgerKey = `payment:${payment.id}`;
+      const existingLedger = await tx.ledgerEntry.findUnique({ where: { idempotencyKey: ledgerKey } });
+
+      if (!existingLedger) {
+        const updated = await tx.wallet.updateMany({
+          where: { userId: user.id },
+          data: { balanceCents: { increment: dto.amountCents } },
+        });
+        if (updated.count !== 1) {
+          throw new BadRequestException('Wallet not found');
+        }
+
+        await tx.ledgerEntry.create({
+          data: {
+            userId: user.id,
+            amountCents: dto.amountCents,
+            type: 'DEPOSIT',
+            idempotencyKey: ledgerKey,
+            referenceId: payment.id,
+          },
+        });
+      }
+
+      const balance = await tx.wallet.findUniqueOrThrow({
+        where: { userId: user.id },
+        select: { balanceCents: true, pendingCents: true },
+      });
+
+      return { paymentId: payment.id, ...balance };
+    });
   }
 
   @Post('mock-withdrawal')
@@ -77,38 +101,61 @@ export class WalletController {
   ) {
     const user = await this.current.require(req);
     const key = requireIdempotencyKey(rawKey);
-    const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey: key } });
 
-    if (
-      existing &&
-      (existing.userId !== user.id ||
-        existing.amountCents !== dto.amountCents ||
-        existing.type !== 'WITHDRAWAL')
-    ) {
-      throw new BadRequestException('Idempotency key was already used');
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.payment.findUnique({ where: { idempotencyKey: key } });
 
-    const payment =
-      existing ??
-      (await this.prisma.payment.create({
-        data: {
-          userId: user.id,
-          type: 'WITHDRAWAL',
-          amountCents: dto.amountCents,
-          status: 'COMPLETED',
-          providerReference: `mock_${key}`,
-          idempotencyKey: key,
-        },
-      }));
+      if (
+        existing &&
+        (existing.userId !== user.id ||
+          existing.amountCents !== dto.amountCents ||
+          existing.type !== 'WITHDRAWAL')
+      ) {
+        throw new BadRequestException('Idempotency key was already used');
+      }
 
-    await this.wallet.apply(
-      user.id,
-      -dto.amountCents,
-      'WITHDRAWAL',
-      `payment:${payment.id}`,
-      payment.id,
-    );
+      const payment =
+        existing ??
+        (await tx.payment.create({
+          data: {
+            userId: user.id,
+            type: 'WITHDRAWAL',
+            amountCents: dto.amountCents,
+            status: 'COMPLETED',
+            providerReference: `mock_${key}`,
+            idempotencyKey: key,
+          },
+        }));
 
-    return { paymentId: payment.id, ...(await this.wallet.balance(user.id)) };
+      const ledgerKey = `payment:${payment.id}`;
+      const existingLedger = await tx.ledgerEntry.findUnique({ where: { idempotencyKey: ledgerKey } });
+
+      if (!existingLedger) {
+        const updated = await tx.wallet.updateMany({
+          where: { userId: user.id, balanceCents: { gte: dto.amountCents } },
+          data: { balanceCents: { decrement: dto.amountCents } },
+        });
+        if (updated.count !== 1) {
+          throw new BadRequestException('Insufficient balance');
+        }
+
+        await tx.ledgerEntry.create({
+          data: {
+            userId: user.id,
+            amountCents: -dto.amountCents,
+            type: 'WITHDRAWAL',
+            idempotencyKey: ledgerKey,
+            referenceId: payment.id,
+          },
+        });
+      }
+
+      const balance = await tx.wallet.findUniqueOrThrow({
+        where: { userId: user.id },
+        select: { balanceCents: true, pendingCents: true },
+      });
+
+      return { paymentId: payment.id, ...balance };
+    });
   }
 }
