@@ -33,6 +33,7 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.auth.revoke(req.cookies?.[COOKIE]);
     res.clearCookie(COOKIE, cookieOptions);
+    return { ok: true };
   }
 
   @Get('me')
