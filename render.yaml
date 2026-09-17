@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: casino-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: "3001"
+      - key: WEB_ORIGIN
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SANDBOX_ADMIN_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: casino-db
+          property: connectionString
+      - key: REDIS_URL
+        value: redis://localhost:6379
+
+  - type: web
+    name: casino-web
+    runtime: docker
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: ./apps/web
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+
+databases:
+  - name: casino-db
+    plan: free
+    databaseName: casino
+    user: casino

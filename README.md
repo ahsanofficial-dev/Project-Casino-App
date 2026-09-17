@@ -13,7 +13,11 @@ Uses **mock odds and mock payments** only — does **not** process real money.
 - Sandbox settlement endpoint (admin key)
 - Docker Compose: Postgres + Redis + API + Web
 
-## Quick start
+## No PC? Deploy from your phone
+
+See **[DEPLOY.md](./DEPLOY.md)** — free Render/Railway steps using only a browser + GitHub.
+
+## Quick start (PC with Docker)
 
 ```bash
 cp .env.example .env
@@ -28,7 +32,7 @@ docker compose up --build
 
 ### Try the flow
 
-1. Open http://localhost:3000  
+1. Open the Web UI  
 2. Register a user  
 3. Mock-deposit e.g. `$50`  
 4. Select an outcome and place a bet  
@@ -47,4 +51,4 @@ Outcomes: `WON` | `LOST` | `VOID`
 - `apps/api` — NestJS + Prisma + PostgreSQL  
 - Redis reserved for future workers  
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for local non-Docker notes.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) and [DEPLOY.md](./DEPLOY.md).
