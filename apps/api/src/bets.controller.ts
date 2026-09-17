@@ -19,7 +19,11 @@ export class BetsController {
   constructor(private readonly current: CurrentUser, private readonly prisma: PrismaService) {}
 
   @Post()
-  async place(@Req() req: Request, @Body() dto: PlaceBetDto, @Headers('idempotency-key') rawKey?: string) {
+  async place(
+    @Req() req: Request,
+    @Body() dto: PlaceBetDto,
+    @Headers('idempotency-key') rawKey?: string,
+  ) {
     const user = await this.current.require(req);
     const key = requireIdempotencyKey(rawKey);
 
@@ -28,6 +32,7 @@ export class BetsController {
         where: { idempotencyKey: key },
         include: { selections: true },
       });
+
       if (existing) {
         if (
           existing.userId !== user.id ||
@@ -43,6 +48,7 @@ export class BetsController {
         where: { id: dto.selectionId },
         include: { market: { include: { event: true } } },
       });
+
       if (
         !selection ||
         selection.market.event.status !== 'OPEN' ||
@@ -60,6 +66,7 @@ export class BetsController {
         where: { userId: user.id, balanceCents: { gte: dto.stakeCents } },
         data: { balanceCents: { decrement: dto.stakeCents } },
       });
+
       if (walletUpdate.count !== 1) {
         throw new BadRequestException('Insufficient balance');
       }
