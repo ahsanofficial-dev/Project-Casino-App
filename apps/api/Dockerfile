@@ -12,4 +12,4 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 EXPOSE 3001
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push && npm run prisma:seed && node dist/main.js"]
