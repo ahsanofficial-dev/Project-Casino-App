@@ -1,0 +1,107 @@
+generator client { provider = "prisma-client-js" }
+ datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum UserStatus { ACTIVE SUSPENDED CLOSED }
+enum EventStatus { OPEN CLOSED SETTLED }
+enum BetStatus { OPEN WON LOST VOID }
+enum LedgerType { DEPOSIT BET_STAKE BET_PAYOUT WITHDRAWAL WITHDRAWAL_REVERSAL BONUS }
+enum PaymentStatus { PROCESSING COMPLETED FAILED }
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  username String @unique
+  passwordHash String
+  status UserStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  wallet Wallet?
+  sessions Session[]
+  bets Bet[]
+  ledgerEntries LedgerEntry[]
+}
+model Session {
+  id String @id @default(cuid())
+  userId String
+  tokenHash String @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+model Wallet {
+  id String @id @default(cuid())
+  userId String @unique
+  balanceCents Int @default(0)
+  pendingCents Int @default(0)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+}
+model LedgerEntry {
+  id String @id @default(cuid())
+  userId String
+  type LedgerType
+  amountCents Int
+  idempotencyKey String @unique
+  referenceId String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+model Event {
+  id String @id @default(cuid())
+  home String
+  away String
+  startsAt DateTime
+  status EventStatus @default(OPEN)
+  markets Market[]
+  bets BetSelection[]
+}
+model Market {
+  id String @id @default(cuid())
+  eventId String
+  name String
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  selections Selection[]
+}
+model Selection {
+  id String @id @default(cuid())
+  marketId String
+  name String
+  odds Decimal @db.Decimal(10, 4)
+  market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+}
+model Bet {
+  id String @id @default(cuid())
+  userId String
+  stakeCents Int
+  combinedOdds Decimal @db.Decimal(12, 4)
+  potentialReturnCents Int
+  status BetStatus @default(OPEN)
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  settledAt DateTime?
+  user User @relation(fields: [userId], references: [id])
+  selections BetSelection[]
+  @@index([userId, createdAt])
+}
+model BetSelection {
+  id String @id @default(cuid())
+  betId String
+  eventId String
+  selectionId String
+  odds Decimal @db.Decimal(10, 4)
+  bet Bet @relation(fields: [betId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id])
+}
+model Payment {
+  id String @id @default(cuid())
+  userId String
+  type String
+  amountCents Int
+  status PaymentStatus @default(PROCESSING)
+  providerReference String @unique
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+}

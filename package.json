@@ -1,0 +1,7 @@
+{
+  "name": "project-casino-app",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {"build": "npm run build -ws", "dev": "npm run dev -ws", "db:generate": "npm --workspace apps/api run prisma:generate", "db:migrate": "npm --workspace apps/api run prisma:migrate"},
+  "engines": {"node": ">=20"}
+}
