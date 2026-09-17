@@ -1,11 +1,11 @@
-import { Controller, Get, Module } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-@Controller()
-class HealthController {
-  @Get('health') health() { return { status: 'ok', service: 'api', sandbox: true }; }
-  @Get('api/events') async events() { return prisma.event.findMany({ where: { status: 'OPEN' }, include: { markets: { include: { selections: true } } } }); }
-}
-@Module({ controllers: [HealthController] })
+import { Module } from '@nestjs/common';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { BetsController } from './bets.controller';
+import { CurrentUser } from './current-user';
+import { EventsController } from './events.controller';
+import { PrismaService } from './prisma.service';
+import { WalletController } from './wallet.controller';
+import { WalletService } from './wallet.service';
+@Module({ controllers: [AuthController, EventsController, WalletController, BetsController], providers: [PrismaService, AuthService, CurrentUser, WalletService] })
 export class AppModule {}
