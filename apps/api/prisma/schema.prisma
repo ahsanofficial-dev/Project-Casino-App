@@ -1,5 +1,5 @@
 generator client { provider = "prisma-client-js" }
- datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
 
 enum UserStatus { ACTIVE SUSPENDED CLOSED }
 enum EventStatus { OPEN CLOSED SETTLED }
@@ -51,6 +51,7 @@ model LedgerEntry {
 }
 model Event {
   id String @id @default(cuid())
+  externalKey String @unique
   home String
   away String
   startsAt DateTime
