@@ -69,10 +69,14 @@ export class AuthService {
 
     const user = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { email: normalizedIdentifier },
-          { username: identifier },
-        ],
+        OR: [{ email: normalizedIdentifier }, { username: identifier }],
+      },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        status: true,
+        passwordHash: true,
       },
     });
 
@@ -80,7 +84,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return user;
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return safeUser;
   }
 
   async createSession(userId: string) {
