@@ -1,33 +1,50 @@
 # Project Casino App
 
 Production-oriented **sandbox** monorepo for a casino/betting platform.  
-This repository intentionally uses **mock odds and mock payments** and does **not** process real money.
+Uses **mock odds and mock payments** only — does **not** process real money.
 
-## Stack
+## Features
 
-- `apps/web`: Next.js (Pages Router) + TypeScript
-- `apps/api`: NestJS + TypeScript
-- PostgreSQL + Prisma
-- Redis (present for future BullMQ workers)
-- Integer minor-unit money values (USD cents)
-- HTTP-only session-cookie authentication
-- Transactional wallet ledger + idempotency model
+- User register / login (HTTP-only session cookie)
+- Wallet with mock deposit & withdrawal (integer USD cents + ledger)
+- Open sports events with odds (seeded)
+- Place bets with idempotency keys
+- Bet history
+- Sandbox settlement endpoint (admin key)
+- Docker Compose: Postgres + Redis + API + Web
 
-## Run locally
+## Quick start
 
 ```bash
 cp .env.example .env
-# Set SESSION_SECRET and SANDBOX_ADMIN_KEY to long random values
+# SESSION_SECRET must be 32+ chars; set SANDBOX_ADMIN_KEY too
 docker compose up --build
 ```
 
 | Service | URL |
 |---------|-----|
-| Web     | http://localhost:3000 |
-| API     | http://localhost:3001/health |
+| Web UI  | http://localhost:3000 |
+| API health | http://localhost:3001/health |
 
-## Important
+### Try the flow
 
-This is a sandbox architecture. Mock deposits, withdrawals, odds, settlement, KYC, geolocation, and responsible-gaming controls are **not** production integrations. Do not connect real payment or betting providers without jurisdictional compliance, legal review, security review, and provider webhook verification.
+1. Open http://localhost:3000  
+2. Register a user  
+3. Mock-deposit e.g. `$50`  
+4. Select an outcome and place a bet  
+5. (Optional) settle a bet:
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for build steps and API notes.
+```bash
+curl -X POST "http://localhost:3001/sandbox/settlement/<BET_ID>/WON" \
+  -H "x-sandbox-admin-key: $SANDBOX_ADMIN_KEY"
+```
+
+Outcomes: `WON` | `LOST` | `VOID`
+
+## Stack
+
+- `apps/web` — Next.js 14 (Pages Router) + TypeScript  
+- `apps/api` — NestJS + Prisma + PostgreSQL  
+- Redis reserved for future workers  
+
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for local non-Docker notes.
